@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using TMPro;
@@ -9,8 +10,8 @@ using Random = UnityEngine.Random;
 
 // ReSharper disable once InconsistentNaming
 [SuppressMessage("ReSharper", "InconsistentNaming")]
-public class GMScript : MonoBehaviour
-{
+public class GMScript : MonoBehaviour {
+    private AudioManager _sfxManager;
     public TileBase pieceTile;
     public TileBase emptyTile;
     public TileBase chunkTile;
@@ -38,7 +39,6 @@ public class GMScript : MonoBehaviour
     private Vector3Int[] _myPiece;
     private Vector3Int[] _myChunk;
     
-    
     private Vector3Int[] PIECE_T;
     private Vector3Int[] PIECE_L;
     private Vector3Int[] PIECE_Z;
@@ -46,6 +46,10 @@ public class GMScript : MonoBehaviour
     private Vector3Int[] PIECE_S;
     private Vector3Int[] PIECE_I;
     private Vector3Int[][] PIECES; 
+    
+    // Adaptivity fields
+    private float _secFromLastKill = 0;
+    private float _killTimer;
 
     // ReSharper disable once InconsistentNaming
     private int wx2bx(int wx)
@@ -64,13 +68,15 @@ public class GMScript : MonoBehaviour
         PIECES = new []{PIECE_T,PIECE_L,PIECE_Z,PIECE_J,PIECE_S,PIECE_I};
     }
     
-    void Start()
-    {
+    void Start() {
         _myPiece = null;
         _myChunk = null;
         _dirty = true;
         _initialized = false;
         InitializePieces();
+        
+        _sfxManager = FindObjectOfType<AudioManager>();
+        _sfxManager.Play("Tetris");
     }
 
 
@@ -156,7 +162,10 @@ public class GMScript : MonoBehaviour
             { 
                 _score += 1;
                if (DEBUG_MODE) Debug.Log($"KILL ROW: {row}! Score: {_score}");
-               
+
+               _secFromLastKill = _killTimer;
+               Debug.Log("Sec from last row cleared: " + _secFromLastKill);
+               _killTimer = 0;
                return KillRow(row);
             }
         }
@@ -271,6 +280,10 @@ public class GMScript : MonoBehaviour
         {
             ChunkPiece();
         }
+
+        /*if (!falling) {
+            StartCoroutine(Pause(2f));
+        }*/
     }
 
     void DoTetrisDrop()
@@ -317,9 +330,27 @@ public class GMScript : MonoBehaviour
             if (_fixedUpdateFramesToWait > 1)
             {
                 _fixedUpdateFramesToWait--;
+                //Debug.Log("Now waiting: " + _fixedUpdateFramesToWait);
             }
         }
 
+        if (_secFromLastKill > 25 && _score < 10) {
+            Debug.Log("Fixed Update Count: " + _fixedUpdateFramesToWait);
+            _fixedUpdateFramesToWait += 5;
+            _secFromLastKill = 0;
+            Debug.Log("Adapting to gameplay!");
+            Debug.Log("Fixed Update Count: " + _fixedUpdateFramesToWait);
+        }
+        
+        if (_secFromLastKill > 5 && _score > 15) {
+            Debug.Log("Fixed Update Count: " + _fixedUpdateFramesToWait);
+            _fixedUpdateFramesToWait -= 5;
+            _secFromLastKill = 0;
+            Debug.Log("Oh so you're good at Tetris?");
+            Debug.Log("Die.");
+            Debug.Log("Fixed Update Count: " + _fixedUpdateFramesToWait);
+        }
+        
         if (CheckKillChunk())
         {
             _inARow++;
@@ -332,6 +363,7 @@ public class GMScript : MonoBehaviour
     
     void Update()
     {
+        _killTimer += Time.deltaTime;
         if (null == Camera.main) return; 
         if (!_initialized) SetupBaseBoard();
         if (null == _myPiece)
@@ -342,7 +374,6 @@ public class GMScript : MonoBehaviour
                 Debug.Break();
             }
         }
-        
         
         if (Input.GetKeyDown(KeyCode.Q)) { Debug.Break(); }
         else if (Input.GetMouseButtonDown(0)) 
@@ -363,7 +394,13 @@ public class GMScript : MonoBehaviour
             DrawBoard();
             DrawPiece();
         }
-    } 
-    
+    }
+
+    /*private IEnumerator Pause(float t) {
+        falling = false;
+        yield return new WaitForSeconds(t);
+        Debug.Log("Waited for " + t + "seconds.");
+        falling = true;
+    }*/
    
 }
